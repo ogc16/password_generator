@@ -1,9 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Password Generator",
+  "name": "SecurePass Generator & Vault",
+  "short_name": "SecurePass",
   "version": "1.0.0",
-  "description": "Generate secure random passwords with user-provided entropy and check password strength",
+  "description": "Generate secure passwords with entropy mixing, check breach status via HIBP, and store them in an AES-256 encrypted local vault.",
   "permissions": ["clipboardWrite"],
+  "host_permissions": ["https://api.pwnedpasswords.com/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -16,5 +18,7 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "categories": ["productivity", "developer_tools"],
+  "minimum_chrome_version": "88"
 }
