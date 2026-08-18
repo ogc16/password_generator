@@ -1,0 +1,401 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 380px;
+  min-height: 500px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+.container {
+  padding: 20px;
+}
+
+h1 {
+  font-size: 18px;
+  text-align: center;
+  margin-bottom: 16px;
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: #16213e;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.tab.active {
+  background: #0f3460;
+  color: #00d4ff;
+}
+
+.tab:hover:not(.active) {
+  color: #ccc;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Entropy section */
+.entropy-section {
+  margin-bottom: 16px;
+}
+
+.entropy-section label {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.entropy-bar {
+  height: 4px;
+  background: #16213e;
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.entropy-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00d4ff, #7c3aed);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.entropy-label {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Input fields */
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input[type="text"]:focus {
+  border-color: #00d4ff;
+}
+
+input[type="text"]::placeholder {
+  color: #444;
+}
+
+/* Length section */
+.length-section {
+  margin-bottom: 16px;
+}
+
+.length-section label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.length-section label span {
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  background: #16213e;
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #00d4ff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.preset {
+  flex: 1;
+  padding: 6px;
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.preset.active {
+  background: #0f3460;
+  border-color: #00d4ff;
+  color: #00d4ff;
+}
+
+.preset:hover:not(.active) {
+  border-color: #00d4ff44;
+  color: #ccc;
+}
+
+/* Toggle switches */
+.options-section {
+  margin-bottom: 16px;
+}
+
+.toggle-row {
+  margin-bottom: 8px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #16213e;
+  border-radius: 10px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #555;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: #0f3460;
+}
+
+.toggle input:checked + .toggle-slider::after {
+  left: 18px;
+  background: #00d4ff;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.generate-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #00d4ff, #7c3aed);
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.generate-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.generate-btn:active {
+  transform: translateY(0);
+}
+
+/* Output section */
+.output-section {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.output-section input {
+  flex: 1;
+}
+
+.copy-btn {
+  background: #0f3460;
+  color: #00d4ff;
+  padding: 10px 14px;
+}
+
+.copy-btn:hover {
+  background: #1a4a7a;
+}
+
+/* Strength meters */
+.strength-meter {
+  height: 6px;
+  background: #16213e;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.strength-meter.large {
+  height: 10px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.strength-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  transition: width 0.3s, background 0.3s;
+}
+
+.strength-fill.weak {
+  background: #ef4444;
+}
+
+.strength-fill.fair {
+  background: #f97316;
+}
+
+.strength-fill.strong {
+  background: #eab308;
+}
+
+.strength-fill.very-strong {
+  background: #22c55e;
+}
+
+.strength-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.strength-label.large {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e0e0e0;
+  display: block;
+  text-align: center;
+}
+
+/* Check strength tab */
+.check-section {
+  margin-bottom: 20px;
+}
+
+.check-section label {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.strength-result {
+  margin-bottom: 20px;
+}
+
+/* Score breakdown */
+.score-breakdown {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #0f3460;
+}
+
+.score-row:last-child {
+  border-bottom: none;
+}
+
+.score-row span:first-child {
+  color: #888;
+}
+
+.score-row span:last-child {
+  color: #00d4ff;
+  font-family: 'Courier New', monospace;
+}
+
+.score-row.penalty span:last-child {
+  color: #ef4444;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0f3460;
+  border-radius: 3px;
+}

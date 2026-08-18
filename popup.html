@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Password Generator</h1>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="generate">Generate</button>
+      <button class="tab" data-tab="check">Check Strength</button>
+    </div>
+
+    <div id="generate" class="tab-content active">
+      <div class="entropy-section">
+        <label for="entropy-input">Type random characters for extra entropy:</label>
+        <input type="text" id="entropy-input" placeholder="junkfkasjdfklasjdf" autocomplete="off">
+        <div class="entropy-bar">
+          <div class="entropy-fill" id="entropy-fill"></div>
+        </div>
+        <span class="entropy-label" id="entropy-label">0 bits added</span>
+      </div>
+
+      <div class="length-section">
+        <label>Password Length: <span id="length-value">16</span></label>
+        <input type="range" id="length-slider" min="8" max="64" value="16">
+        <div class="preset-buttons">
+          <button class="preset" data-length="12">12</button>
+          <button class="preset active" data-length="16">16</button>
+          <button class="preset" data-length="24">24</button>
+          <button class="preset" data-length="32">32</button>
+        </div>
+      </div>
+
+      <div class="options-section">
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="opt-upper" checked>
+            <span class="toggle-slider"></span>
+            Uppercase (A-Z)
+          </label>
+        </div>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="opt-lower" checked>
+            <span class="toggle-slider"></span>
+            Lowercase (a-z)
+          </label>
+        </div>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="opt-digits" checked>
+            <span class="toggle-slider"></span>
+            Digits (0-9)
+          </label>
+        </div>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="opt-symbols" checked>
+            <span class="toggle-slider"></span>
+            Symbols (!@#$...)
+          </label>
+        </div>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="opt-ambiguous">
+            <span class="toggle-slider"></span>
+            Exclude ambiguous (0/O, l/1/I)
+          </label>
+        </div>
+      </div>
+
+      <button class="btn generate-btn" id="generate-btn">Generate Password</button>
+
+      <div class="output-section">
+        <input type="text" id="generated-password" readonly placeholder="Click generate...">
+        <button class="btn copy-btn" id="copy-btn">Copy</button>
+      </div>
+
+      <div class="strength-preview" id="gen-strength-preview">
+        <div class="strength-meter">
+          <div class="strength-fill" id="gen-strength-fill"></div>
+        </div>
+        <span class="strength-label" id="gen-strength-label"></span>
+      </div>
+    </div>
+
+    <div id="check" class="tab-content">
+      <div class="check-section">
+        <label for="check-input">Enter a password to check:</label>
+        <input type="text" id="check-input" placeholder="Type or paste password..." autocomplete="off">
+      </div>
+
+      <div class="strength-result">
+        <div class="strength-meter large">
+          <div class="strength-fill" id="check-strength-fill"></div>
+        </div>
+        <span class="strength-label large" id="check-strength-label"></span>
+      </div>
+
+      <div class="score-breakdown" id="score-breakdown">
+        <div class="score-row">
+          <span>Entropy</span>
+          <span id="score-entropy">0 bits</span>
+        </div>
+        <div class="score-row">
+          <span>Length Score</span>
+          <span id="score-length">0</span>
+        </div>
+        <div class="score-row">
+          <span>Character Diversity</span>
+          <span id="score-diversity">0/4</span>
+        </div>
+        <div class="score-row penalty">
+          <span>Pattern Penalty</span>
+          <span id="score-pattern">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
