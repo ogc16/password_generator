@@ -6,7 +6,7 @@ Thanks for your interest in contributing to Password Generator!
 
 1. Fork the repository
 2. Clone your fork
-3. Make your changes in the `password/` directory
+3. Run `npm install`
 4. Test by loading as unpacked extension in Chrome
 
 ## Development Setup
@@ -20,19 +20,43 @@ No build step required — edit files directly and reload the extension in `chro
 3. Click the refresh icon on the Password Generator card
 4. Click the extension icon to test
 
+### Running Tests
+
+```bash
+npm test        # Run unit tests
+npm run lint    # Run ESLint
+```
+
+CI runs automatically on push and PR to `main`.
+
 ## Code Style
 
 - Vanilla JavaScript (no frameworks)
-- CSS with custom properties for theming
-- Keep functions focused and under 50 lines
+- Vault code is wrapped in an IIFE — keep it isolated
 - Use `crypto.getRandomValues()` for any randomness — never `Math.random()`
+- Use Web Crypto API for hashing and encryption
+- Keep functions focused and under 50 lines
+
+## Architecture
+
+- **Generate tab**: Entropy mixing, length/charset config, password generation
+- **Check tab**: Real-time strength analysis, HIBP k-anonymity breach check, common word detection
+- **Vault tab**: AES-256-GCM encryption via PBKDF2-derived keys, IndexedDB storage
+
+### Vault Code
+
+The vault uses an IIFE pattern to isolate its state. When modifying vault code:
+- Never store the passphrase or raw key
+- Keep PBKDF2 iterations at 600,000 minimum
+- Use AES-GCM (not AES-CBC) for authenticated encryption
+- Store only encrypted data in IndexedDB
 
 ## Pull Requests
 
 1. Create a feature branch from `main`
 2. Keep PRs focused on one change
-3. Describe what you changed and why
-4. Test the extension before submitting
+3. Run `npm test` and `npm run lint` before submitting
+4. Describe what you changed and why
 
 ## Reporting Issues
 

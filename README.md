@@ -1,15 +1,18 @@
 # Password Generator Chrome Extension
 
-A secure password generator Chrome extension that combines cryptographic randomness with user-provided entropy. Includes a real-time password strength checker with pattern detection.
+A secure password generator Chrome extension that combines cryptographic randomness with user-provided entropy. Includes a real-time password strength checker with HIBP breach detection, common password filtering, and an encrypted local vault.
 
 ## Features
 
 - **Entropy-mixed generation**: Type random characters to add your own entropy to the cryptographic seed
-- **Configurable length**: Slider (8-64) with preset buttons (12, 16, 24, 32)
+- **Configurable length**: Slider (8-128) with preset buttons (12, 16, 24, 32, 64, 128)
 - **Character toggles**: Uppercase, lowercase, digits, symbols — all configurable
 - **Exclude ambiguous characters**: Skip `0/O`, `l/1/I`, `|` for cleaner passwords
 - **Strength checker**: Real-time analysis with entropy calculation and pattern detection
-- **Pattern penalties**: Detects sequential characters, repeats, and keyboard walks
+- **Common password detection**: Flags known weak passwords and common words instantly
+- **HIBP breach check**: k-anonymity API check against Have I Been Pwned (password never leaves client)
+- **Encrypted local vault**: Save passwords locally with AES-256-GCM encryption (PBKDF2 key derivation)
+- **Screen-reader compatible**: ARIA live regions, keyboard navigation, proper focus management
 - **Copy to clipboard**: One-click copy with confirmation
 
 ## Installation
@@ -33,13 +36,24 @@ A secure password generator Chrome extension that combines cryptographic randomn
 
 ### Check Password Strength
 
-1. Switch to the **Check Strength** tab
+1. Switch to the **Check** tab
 2. Type or paste any password
 3. View the strength meter and detailed breakdown:
    - Entropy bits
    - Length score
    - Character diversity (0-4 sets)
    - Pattern penalties
+   - Common word penalties
+   - HIBP breach count
+
+### Encrypted Vault
+
+1. Switch to the **Vault** tab
+2. Set a master passphrase (min 4 characters)
+3. After generating a password, enter a label and click **Save**
+4. Saved passwords are encrypted with AES-256-GCM using PBKDF2-derived keys
+5. Click **Copy** next to any entry to decrypt and copy
+6. Click **Lock Vault** to clear the key from memory
 
 ## Strength Scoring
 
@@ -49,6 +63,8 @@ A secure password generator Chrome extension that combines cryptographic randomn
 | Length | 0-30 | Characters * 2, capped at 30 |
 | Diversity | 0-20 | 5 points per character set used |
 | Patterns | -5 to -10 | Penalties for sequences, repeats, keyboard walks |
+| Common Words | -15 each | Penalty for each common word found in password |
+| Common Password | instant 0 | Known weak passwords score 0 immediately |
 
 ### Rating Thresholds
 
@@ -63,21 +79,36 @@ A secure password generator Chrome extension that combines cryptographic randomn
 
 - Uses `crypto.getRandomValues()` for cryptographic randomness
 - User entropy is XOR-mixed with random bytes before generation
-- No data is stored or transmitted — all processing is local
+- HIBP k-anonymity: only the first 5 chars of a SHA-1 hash are sent — full password never leaves the client
+- Vault encryption: AES-256-GCM with PBKDF2 key derivation (600,000 iterations, SHA-256)
+- All data stored locally in IndexedDB — no external storage
 - Manifest V3 with minimal permissions (`clipboardWrite` only)
 
 ## Files
 
 ```
 password/
-├── manifest.json      # Extension configuration
-├── popup.html         # UI structure
-├── popup.js           # Core logic
-├── popup.css          # Styling
-├── icons/             # Extension icons
-├── README.md          # This file
-├── CONTRIBUTING.md    # Contribution guidelines
-└── LICENSE            # MIT License
+├── manifest.json        # Extension configuration (Manifest V3)
+├── popup.html           # UI structure with 3 tabs
+├── popup.js             # Core logic (generator, strength, vault)
+├── popup.css            # Styling + vault UI
+├── icons/               # Extension icons (16, 48, 128px)
+├── test.js              # Unit tests for strength analyzer
+├── eslint.config.js     # ESLint configuration
+├── package.json         # Node.js project config
+├── .github/workflows/   # CI pipeline
+│   └── ci.yml
+├── README.md            # This file
+├── CONTRIBUTING.md      # Contribution guidelines
+└── LICENSE              # MIT License
+```
+
+## Development
+
+```bash
+npm install
+npm run lint    # Run ESLint
+npm test        # Run unit tests
 ```
 
 ## License

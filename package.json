@@ -1,0 +1,13 @@
+{
+  "name": "password-generator-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension for password generation with entropy mixing and strength checking",
+  "private": true,
+  "scripts": {
+    "lint": "eslint popup.js",
+    "test": "node test.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

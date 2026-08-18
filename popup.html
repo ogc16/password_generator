@@ -6,120 +6,154 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Password Generator</h1>
+  <div class="container" role="main">
+    <h1 id="app-title">Password Generator</h1>
 
-    <div class="tabs">
-      <button class="tab active" data-tab="generate">Generate</button>
-      <button class="tab" data-tab="check">Check Strength</button>
+    <!-- Live region for screen reader announcements -->
+    <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="tabs" role="tablist" aria-label="Password tools">
+      <button class="tab active" data-tab="generate" role="tab" id="tab-generate" aria-selected="true" aria-controls="panel-generate" tabindex="0">Generate</button>
+      <button class="tab" data-tab="check" role="tab" id="tab-check" aria-selected="false" aria-controls="panel-check" tabindex="-1">Check</button>
+      <button class="tab" data-tab="vault" role="tab" id="tab-vault" aria-selected="false" aria-controls="panel-vault" tabindex="-1">Vault</button>
     </div>
 
-    <div id="generate" class="tab-content active">
+    <div id="generate" class="tab-content active" role="tabpanel" aria-labelledby="tab-generate">
       <div class="entropy-section">
         <label for="entropy-input">Type random characters for extra entropy:</label>
-        <input type="text" id="entropy-input" placeholder="junkfkasjdfklasjdf" autocomplete="off">
-        <div class="entropy-bar">
+        <input type="text" id="entropy-input" placeholder="junkfkasjdfklasjdf" autocomplete="off" aria-describedby="entropy-label">
+        <div class="entropy-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Entropy contribution">
           <div class="entropy-fill" id="entropy-fill"></div>
         </div>
         <span class="entropy-label" id="entropy-label">0 bits added</span>
       </div>
 
       <div class="length-section">
-        <label>Password Length: <span id="length-value">16</span></label>
-        <input type="range" id="length-slider" min="8" max="64" value="16">
-        <div class="preset-buttons">
-          <button class="preset" data-length="12">12</button>
-          <button class="preset active" data-length="16">16</button>
-          <button class="preset" data-length="24">24</button>
-          <button class="preset" data-length="32">32</button>
+        <label for="length-slider">Password Length: <span id="length-value">16</span></label>
+        <input type="range" id="length-slider" min="8" max="128" value="16" aria-describedby="length-value">
+        <div class="preset-buttons" role="group" aria-label="Preset password lengths">
+          <button class="preset" data-length="12" aria-pressed="false">12</button>
+          <button class="preset active" data-length="16" aria-pressed="true">16</button>
+          <button class="preset" data-length="24" aria-pressed="false">24</button>
+          <button class="preset" data-length="32" aria-pressed="false">32</button>
+          <button class="preset" data-length="64" aria-pressed="false">64</button>
+          <button class="preset" data-length="128" aria-pressed="false">128</button>
         </div>
       </div>
 
-      <div class="options-section">
+      <div class="options-section" role="group" aria-label="Character set options">
         <div class="toggle-row">
           <label class="toggle">
-            <input type="checkbox" id="opt-upper" checked>
-            <span class="toggle-slider"></span>
+            <input type="checkbox" id="opt-upper" checked aria-label="Include uppercase letters">
+            <span class="toggle-slider" aria-hidden="true"></span>
             Uppercase (A-Z)
           </label>
         </div>
         <div class="toggle-row">
           <label class="toggle">
-            <input type="checkbox" id="opt-lower" checked>
-            <span class="toggle-slider"></span>
+            <input type="checkbox" id="opt-lower" checked aria-label="Include lowercase letters">
+            <span class="toggle-slider" aria-hidden="true"></span>
             Lowercase (a-z)
           </label>
         </div>
         <div class="toggle-row">
           <label class="toggle">
-            <input type="checkbox" id="opt-digits" checked>
-            <span class="toggle-slider"></span>
+            <input type="checkbox" id="opt-digits" checked aria-label="Include digits">
+            <span class="toggle-slider" aria-hidden="true"></span>
             Digits (0-9)
           </label>
         </div>
         <div class="toggle-row">
           <label class="toggle">
-            <input type="checkbox" id="opt-symbols" checked>
-            <span class="toggle-slider"></span>
+            <input type="checkbox" id="opt-symbols" checked aria-label="Include symbols">
+            <span class="toggle-slider" aria-hidden="true"></span>
             Symbols (!@#$...)
           </label>
         </div>
         <div class="toggle-row">
           <label class="toggle">
-            <input type="checkbox" id="opt-ambiguous">
-            <span class="toggle-slider"></span>
+            <input type="checkbox" id="opt-ambiguous" aria-label="Exclude ambiguous characters">
+            <span class="toggle-slider" aria-hidden="true"></span>
             Exclude ambiguous (0/O, l/1/I)
           </label>
         </div>
       </div>
 
-      <button class="btn generate-btn" id="generate-btn">Generate Password</button>
+      <button class="btn generate-btn" id="generate-btn" aria-describedby="sr-announcer">Generate Password</button>
 
       <div class="output-section">
-        <input type="text" id="generated-password" readonly placeholder="Click generate...">
-        <button class="btn copy-btn" id="copy-btn">Copy</button>
+        <input type="text" id="generated-password" readonly placeholder="Click generate..." aria-label="Generated password" aria-live="polite">
+        <button class="btn copy-btn" id="copy-btn" aria-label="Copy password to clipboard">Copy</button>
       </div>
 
-      <div class="strength-preview" id="gen-strength-preview">
-        <div class="strength-meter">
+      <div class="strength-preview" id="gen-strength-preview" aria-live="polite">
+        <div class="strength-meter" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Password strength">
           <div class="strength-fill" id="gen-strength-fill"></div>
         </div>
-        <span class="strength-label" id="gen-strength-label"></span>
+        <span class="strength-label" id="gen-strength-label" aria-live="polite"></span>
       </div>
     </div>
 
-    <div id="check" class="tab-content">
+    <div id="check" class="tab-content" role="tabpanel" aria-labelledby="tab-check">
       <div class="check-section">
         <label for="check-input">Enter a password to check:</label>
-        <input type="text" id="check-input" placeholder="Type or paste password..." autocomplete="off">
+        <input type="text" id="check-input" placeholder="Type or paste password..." autocomplete="off" aria-describedby="check-strength-label check-entropy check-diversity check-pattern">
       </div>
 
-      <div class="strength-result">
-        <div class="strength-meter large">
+      <div class="strength-result" aria-live="polite">
+        <div class="strength-meter large" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Password strength">
           <div class="strength-fill" id="check-strength-fill"></div>
         </div>
         <span class="strength-label large" id="check-strength-label"></span>
       </div>
 
-      <div class="score-breakdown" id="score-breakdown">
+      <div class="score-breakdown" id="score-breakdown" aria-label="Strength score breakdown">
         <div class="score-row">
           <span>Entropy</span>
-          <span id="score-entropy">0 bits</span>
+          <span id="score-entropy" aria-live="polite">0 bits</span>
         </div>
         <div class="score-row">
           <span>Length Score</span>
-          <span id="score-length">0</span>
+          <span id="score-length" aria-live="polite">0</span>
         </div>
         <div class="score-row">
           <span>Character Diversity</span>
-          <span id="score-diversity">0/4</span>
+          <span id="score-diversity" aria-live="polite">0/4</span>
         </div>
         <div class="score-row penalty">
           <span>Pattern Penalty</span>
           <span id="score-pattern">0</span>
         </div>
+        <div class="score-row penalty" id="common-words-row" hidden>
+          <span>Common Words</span>
+          <span id="score-common" aria-live="polite">0</span>
+        </div>
+        <div class="score-row breach" id="breach-row" hidden>
+          <span>Breaches Found</span>
+          <span id="score-breach" aria-live="polite">Checking...</span>
+        </div>
       </div>
     </div>
+
+    <div id="vault" class="tab-content" role="tabpanel" aria-labelledby="tab-vault">
+      <div id="vault-unlock" class="vault-section">
+        <p class="vault-desc">Encrypt and store passwords locally with AES-256-GCM.</p>
+        <label for="vault-passphrase">Master passphrase:</label>
+        <input type="password" id="vault-passphrase" placeholder="Enter passphrase..." autocomplete="off" aria-describedby="vault-passphrase-help">
+        <span id="vault-passphrase-help" class="vault-help">Used to derive your encryption key via PBKDF2 (600k iterations). Never stored.</span>
+        <button class="btn vault-unlock-btn" id="vault-unlock-btn">Unlock Vault</button>
+      </div>
+
+      <div id="vault-manage" class="vault-section" hidden>
+        <div class="vault-save-row">
+          <input type="text" id="vault-entry-label" placeholder="Label (e.g. GitHub)" aria-label="Entry label">
+          <button class="btn vault-save-btn" id="vault-save-btn" aria-label="Save generated password to vault">Save</button>
+        </div>
+        <ul id="vault-list" class="vault-list" aria-label="Saved passwords"></ul>
+        <button class="btn vault-lock-btn" id="vault-lock-btn">Lock Vault</button>
+      </div>
+    </div>
+
   </div>
 
   <script src="popup.js"></script>

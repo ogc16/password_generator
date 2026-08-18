@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+
+  validate-manifest:
+    name: Validate Manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check manifest.json is valid JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest.json valid')"
+      - name: Verify required fields
+        run: |
+          node -e "
+            const m = JSON.parse(require('fs').readFileSync('manifest.json','utf8'));
+            if (m.manifest_version !== 3) throw new Error('Must be manifest_version 3');
+            if (!m.name) throw new Error('Missing name');
+            if (!m.version) throw new Error('Missing version');
+            if (!m.action?.default_popup) throw new Error('Missing default_popup');
+            console.log('Manifest validation passed');
+          "
+      - name: Verify all referenced files exist
+        run: |
+          node -e "
+            const m = JSON.parse(require('fs').readFileSync('manifest.json','utf8'));
+            const fs = require('fs');
+            const files = [m.action.default_popup];
+            for (const size of Object.keys(m.icons || {})) files.push(m.icons[size]);
+            for (const f of files) {
+              if (!fs.existsSync(f)) throw new Error('Missing file: ' + f);
+            }
+            console.log('All referenced files exist');
+          "
