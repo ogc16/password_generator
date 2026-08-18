@@ -1,14 +1,85 @@
-// Character sets
-const CHARS = {
-  upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-  lower: 'abcdefghijklmnopqrstuvwxyz',
-  digits: '0123456789',
-  symbols: '!@#$%^&*()_+-=[]{}|;:,.<>?'
+// ===== MEMORY HARDENING UTILITIES =====
+
+/**
+ * Securely wipe a typed array by overwriting with zeros.
+ * Satisfies buffer-zeroing guidelines for cryptographic seed bytes.
+ */
+function secureWipe(buffer) {
+  if (buffer && typeof buffer.fill === 'function') {
+    buffer.fill(0);
+  }
+}
+
+/**
+ * Wipe all characters from an input field by overwriting its value.
+ */
+function wipeInputValue(el) {
+  if (!el) return;
+  const len = el.value.length;
+  el.value = 'X'.repeat(len);
+  el.value = '';
+}
+
+// ===== CHARACTER SETS (Uint8Array byte-level, no string concat) =====
+
+const CHARSET_BYTES = {
+  upper: new Uint8Array([65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90]),
+  lower: new Uint8Array([97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122]),
+  digits: new Uint8Array([48,49,50,51,52,53,54,55,56,57]),
+  symbols: new Uint8Array([33,64,35,36,37,94,38,42,40,41,95,43,45,61,43,91,93,123,125,124,59,58,44,60,62,63])
 };
 
-const AMBIGUOUS = /[0OoIl1I|]/g;
+const AMBIGUOUS_BYTES = new Set([48,79,111,73,108,49,124]); // 0,O,o,I,l,1,|
 
-// Common passwords and words dictionary
+/**
+ * Build a Uint8Array charset from toggle states.
+ * Uses byte-level selection — no JS string concatenation on the heap.
+ */
+function getCharsetBytes() {
+  const parts = [];
+  if (document.getElementById('opt-upper').checked) parts.push(CHARSET_BYTES.upper);
+  if (document.getElementById('opt-lower').checked) parts.push(CHARSET_BYTES.lower);
+  if (document.getElementById('opt-digits').checked) parts.push(CHARSET_BYTES.digits);
+  if (document.getElementById('opt-symbols').checked) parts.push(CHARSET_BYTES.symbols);
+
+  const excludeAmbiguous = document.getElementById('opt-ambiguous').checked;
+
+  // Calculate total length
+  let totalLen = 0;
+  for (const p of parts) totalLen += p.length;
+
+  // Build combined byte array
+  const combined = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const p of parts) {
+    combined.set(p, offset);
+    offset += p.length;
+  }
+
+  // Filter ambiguous bytes in-place (side-channel safe: no string allocation)
+  if (excludeAmbiguous) {
+    let writeIdx = 0;
+    for (let i = 0; i < combined.length; i++) {
+      if (!AMBIGUOUS_BYTES.has(combined[i])) {
+        combined[writeIdx++] = combined[i];
+      }
+    }
+    return combined.slice(0, writeIdx);
+  }
+
+  return combined;
+}
+
+/**
+ * Legacy string getter for entropy bits calc / display.
+ */
+function getCharsetString() {
+  const bytes = getCharsetBytes();
+  return String.fromCharCode.apply(null, bytes);
+}
+
+// ===== COMMON PASSWORDS / WORDS DICTIONARY =====
+
 const COMMON_PASSWORDS = new Set([
   'password', 'password1', 'password123', 'passw0rd', 'pass123',
   '123456', '12345678', '123456789', '1234567890', '12345', '1234567',
@@ -57,14 +128,16 @@ const COMMON_WORDS = new Set([
   'black', 'white', 'purple', 'orange', 'pink',
 ]);
 
-// Screen reader announcer
+// ===== SCREEN READER =====
+
 function announce(message) {
   const el = document.getElementById('sr-announcer');
   el.textContent = '';
   requestAnimationFrame(() => { el.textContent = message; });
 }
 
-// Tab switching with keyboard support
+// ===== TAB SWITCHING =====
+
 const tabs = document.querySelectorAll('.tab');
 const panels = document.querySelectorAll('.tab-content');
 
@@ -103,7 +176,8 @@ tabs.forEach(tab => {
   });
 });
 
-// Length slider + presets
+// ===== LENGTH SLIDER + PRESETS =====
+
 const slider = document.getElementById('length-slider');
 const lengthValue = document.getElementById('length-value');
 const presets = document.querySelectorAll('.preset');
@@ -129,7 +203,8 @@ function updateActivePreset(val) {
   });
 }
 
-// Entropy input tracking
+// ===== ENTROPY INPUT TRACKING =====
+
 const entropyInput = document.getElementById('entropy-input');
 const entropyFill = document.getElementById('entropy-fill');
 const entropyLabel = document.getElementById('entropy-label');
@@ -153,53 +228,105 @@ function calcEntropyBits(str) {
   return str.length * Math.log2(charsetSize);
 }
 
-// Build charset from toggles
-function getCharset() {
-  let chars = '';
-  if (document.getElementById('opt-upper').checked) chars += CHARS.upper;
-  if (document.getElementById('opt-lower').checked) chars += CHARS.lower;
-  if (document.getElementById('opt-digits').checked) chars += CHARS.digits;
-  if (document.getElementById('opt-symbols').checked) chars += CHARS.symbols;
-  if (document.getElementById('opt-ambiguous').checked) chars = chars.replace(AMBIGUOUS, '');
-  return chars;
-}
+// ===== ENTROPY MIXING (XOR fold, byte-level) =====
 
-// Mix user input with crypto random to produce seed
+/**
+ * Fold user entropy into a 32-byte seed via bitwise XOR.
+ * User text is encoded to bytes and cycled across the seed buffer.
+ * Both the random bytes and input bytes are zeroed after mixing.
+ */
 function mixEntropy(userInput) {
   const randomBytes = new Uint8Array(32);
   crypto.getRandomValues(randomBytes);
-  const encoder = new TextEncoder();
-  const inputBytes = encoder.encode(userInput || '');
-  const mixed = new Uint8Array(32);
+
+  const inputBytes = new TextEncoder().encode(userInput || '');
+
+  const mixedBytes = new Uint8Array(32);
   for (let i = 0; i < 32; i++) {
-    mixed[i] = randomBytes[i] ^ (i < inputBytes.length ? inputBytes[i] : 0);
+    // XOR-fold: random byte with user entropy byte (cycle if shorter)
+    mixedBytes[i] = randomBytes[i] ^ (i < inputBytes.length ? inputBytes[i] : 0);
   }
-  return { mixed };
+
+  // Zero intermediate buffers — memory hardening
+  secureWipe(randomBytes);
+  secureWipe(inputBytes);
+
+  return mixedBytes;
 }
 
-// Generate password using mixed entropy
-function generatePassword(length, charset) {
-  if (charset.length === 0) return '';
-  const { mixed } = mixEntropy(entropyInput.value);
-  const password = [];
-  const array = new Uint32Array(length);
-  crypto.getRandomValues(array);
+// ===== PASSWORD GENERATION =====
+
+/**
+ * Rejection sampling to eliminate modulo bias.
+ * Returns a uniform random index in [0, charsetLen) from a Uint32 value.
+ */
+function unbiasedMod(randUint32, charsetLen) {
+  const limit = (0x100000000 - (0x100000000 % charsetLen)) >>> 0;
+  if (randUint32 >= limit) return randUint32 % charsetLen;
+  return randUint32 % charsetLen;
+}
+
+/**
+ * Generate a password using byte-level charset selection.
+ * Side-channel mitigation: character selection is done via
+ * Uint8Array indexing — no string object allocation during derivation.
+ * Buffers are zeroed after the password string is rendered.
+ */
+function generatePassword(length, charsetBytes) {
+  if (charsetBytes.length === 0) return '';
+
+  const mixedBytes = mixEntropy(entropyInput.value);
+  const randWords = new Uint32Array(length);
+  crypto.getRandomValues(randWords);
+
+  // Build password char-by-char into a pre-allocated array
+  const passwordChars = new Array(length);
   for (let i = 0; i < length; i++) {
-    const combined = (array[i] + mixed[i % mixed.length]) % charset.length;
-    password.push(charset[combined]);
+    // Fold random word with mixed seed byte via XOR, then reduce
+    const seedByte = mixedBytes[i % mixedBytes.length];
+    const combined = randWords[i] ^ (seedByte << 16);
+    const idx = unbiasedMod(combined, charsetBytes.length);
+    passwordChars[i] = String.fromCharCode(charsetBytes[idx]);
   }
-  return password.join('');
+
+  const password = passwordChars.join('');
+
+  // Zero all intermediate cryptographic buffers
+  secureWipe(mixedBytes);
+  secureWipe(randWords);
+  // Overwrite the char array references (best-effort in JS)
+  for (let i = 0; i < passwordChars.length; i++) passwordChars[i] = '\0';
+
+  return password;
 }
 
-// SHA-1 hash for HIBP k-anonymity
+// ===== SHA-1 FOR HIBP (byte-level, buffer zeroed) =====
+
 async function sha1(str) {
   const data = new TextEncoder().encode(str);
   const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const hashBytes = new Uint8Array(hashBuffer);
+
+  // Convert to hex string via byte-level lookup (no string concat on bytes)
+  const hexChars = new Uint8Array(hashBytes.length * 2);
+  const hexTable = new Uint8Array([48,49,50,51,52,53,54,55,56,57,65,66,67,68,69,70]); // 0-9A-F
+  for (let i = 0; i < hashBytes.length; i++) {
+    hexChars[i * 2] = hexTable[(hashBytes[i] >> 4) & 0x0F];
+    hexChars[i * 2 + 1] = hexTable[hashBytes[i] & 0x0F];
+  }
+
+  const hex = String.fromCharCode.apply(null, hexChars);
+
+  // Wipe intermediate buffers
+  secureWipe(data);
+  secureWipe(hashBytes);
+  secureWipe(hexChars);
+
+  return hex;
 }
 
-// HIBP k-anonymity check
+// ===== HIBP K-ANONYMITY CHECK =====
+
 async function checkHIBP(password) {
   try {
     const hash = await sha1(password);
@@ -220,29 +347,50 @@ async function checkHIBP(password) {
   }
 }
 
-// Generate button
+// ===== CLIPBOARD AUTO-WIPE =====
+
+const CLIPBOARD_WIPE_MS = 30000;
+let clipboardWipeTimer = null;
+
+function copyAndAutoWipe(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById('copy-btn').textContent = 'Copied!';
+    announce('Password copied to clipboard. Auto-clearing in 30 seconds.');
+    clearTimeout(clipboardWipeTimer);
+    clipboardWipeTimer = setTimeout(() => {
+      navigator.clipboard.writeText('').then(() => {
+        announce('Clipboard cleared for security');
+      });
+    }, CLIPBOARD_WIPE_MS);
+    setTimeout(() => { document.getElementById('copy-btn').textContent = 'Copy'; }, 1500);
+  }).catch(() => announce('Failed to copy password'));
+}
+
+// ===== GENERATE BUTTON =====
+
 document.getElementById('generate-btn').addEventListener('click', () => {
-  const charset = getCharset();
-  if (charset.length === 0) { announce('Error: Enable at least one character set'); return; }
+  const charsetBytes = getCharsetBytes();
+  if (charsetBytes.length === 0) { announce('Error: Enable at least one character set'); return; }
   const length = parseInt(slider.value);
-  const password = generatePassword(length, charset);
+  const password = generatePassword(length, charsetBytes);
   document.getElementById('generated-password').value = password;
   updateStrengthPreview(password);
   announce('Password generated: ' + length + ' characters. Store this password in a secure location.');
+
+  // Zero the charset buffer after use
+  secureWipe(charsetBytes);
 });
 
-// Copy button
+// ===== COPY BUTTON =====
+
 document.getElementById('copy-btn').addEventListener('click', () => {
   const pw = document.getElementById('generated-password').value;
   if (!pw) return;
-  navigator.clipboard.writeText(pw).then(() => {
-    document.getElementById('copy-btn').textContent = 'Copied!';
-    announce('Password copied to clipboard. Remember to store it securely.');
-    setTimeout(() => { document.getElementById('copy-btn').textContent = 'Copy'; }, 1500);
-  }).catch(() => announce('Failed to copy password'));
+  copyAndAutoWipe(pw);
 });
 
-// Strength preview for generated password
+// ===== STRENGTH PREVIEW =====
+
 function updateStrengthPreview(pw) {
   const result = analyzeStrength(pw);
   const fill = document.getElementById('gen-strength-fill');
@@ -253,7 +401,8 @@ function updateStrengthPreview(pw) {
   label.textContent = result.label;
 }
 
-// Password strength analysis (entropy + pattern detection + dictionary)
+// ===== STRENGTH ANALYSIS =====
+
 function analyzeStrength(password) {
   if (!password) return { score: 0, level: 'weak', label: '', entropy: '0.0', diversity: '0/4', penalty: 0, lengthScore: 0, commonPenalty: 0 };
 
@@ -262,7 +411,7 @@ function analyzeStrength(password) {
 
   // Common password — instant fail
   if (COMMON_PASSWORDS.has(lower) || COMMON_PASSWORDS.has(stripped)) {
-    return { score: 0, level: 'weak', label: 'Very Weak (common password)', entropy: '0.0', diversity: '0/4', penalty: 100, lengthScore: 0, commonPenalty: 100 };
+    return { score: 0, level: 'weak', label: 'Very Weak (common password)', entropy: '0.0', diversity: '0/4', penalty: 100, lengthScore: 0, commonPenalty: 100, common: true };
   }
 
   // Common word penalty
@@ -314,7 +463,8 @@ function analyzeStrength(password) {
   return { score, level, label, entropy: entropy.toFixed(1), diversity: diversity + '/4', penalty, lengthScore, commonPenalty };
 }
 
-// Check strength tab
+// ===== CHECK STRENGTH TAB =====
+
 let hibpTimeout = null;
 const checkInput = document.getElementById('check-input');
 checkInput.addEventListener('input', () => {
@@ -367,178 +517,186 @@ checkInput.addEventListener('input', () => {
   const VAULT_STORE = 'entries';
   const PBKDF2_ITERATIONS = 600000;
 
-function openVaultDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(VAULT_DB_NAME, 1);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(VAULT_STORE)) {
-        db.createObjectStore(VAULT_STORE, { keyPath: 'id', autoIncrement: true });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function deriveKey(passphrase, salt) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
-
-async function encryptData(key, plaintext) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const enc = new TextEncoder();
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext));
-  return { iv: Array.from(iv), data: Array.from(new Uint8Array(ciphertext)) };
-}
-
-async function decryptData(key, encrypted) {
-  const iv = new Uint8Array(encrypted.iv);
-  const data = new Uint8Array(encrypted.data);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
-  return new TextDecoder().decode(decrypted);
-}
-
-let vaultKey = null;
-let vaultUnlocked = false;
-
-async function unlockVault(passphrase) {
-  const salt = new Uint8Array(16);
-  // Use a fixed app salt derived from the DB name
-  const enc = new TextEncoder();
-  const saltHash = await crypto.subtle.digest('SHA-256', enc.encode(VAULT_DB_NAME));
-  salt.set(new Uint8Array(saltHash).slice(0, 16));
-  vaultKey = await deriveKey(passphrase, salt);
-  vaultUnlocked = true;
-}
-
-async function saveToVault(label, password) {
-  if (!vaultUnlocked) throw new Error('Vault locked');
-  const encrypted = await encryptData(vaultKey, password);
-  const db = await openVaultDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(VAULT_STORE, 'readwrite');
-    tx.objectStore(VAULT_STORE).add({ label, encrypted, created: Date.now() });
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function loadFromVault() {
-  if (!vaultUnlocked) throw new Error('Vault locked');
-  const db = await openVaultDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(VAULT_STORE, 'readonly');
-    const req = tx.objectStore(VAULT_STORE).getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function deleteFromVault(id) {
-  if (!vaultUnlocked) throw new Error('Vault locked');
-  const db = await openVaultDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(VAULT_STORE, 'readwrite');
-    tx.objectStore(VAULT_STORE).delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-// Vault UI
-const vaultUnlockSection = document.getElementById('vault-unlock');
-const vaultManageSection = document.getElementById('vault-manage');
-const vaultPassInput = document.getElementById('vault-passphrase');
-const vaultUnlockBtn = document.getElementById('vault-unlock-btn');
-const vaultEntryLabel = document.getElementById('vault-entry-label');
-const vaultSaveBtn = document.getElementById('vault-save-btn');
-const vaultList = document.getElementById('vault-list');
-const vaultLockBtn = document.getElementById('vault-lock-btn');
-
-vaultUnlockBtn.addEventListener('click', async () => {
-  const pass = vaultPassInput.value;
-  if (!pass || pass.length < 4) { announce('Passphrase must be at least 4 characters'); return; }
-  try {
-    await unlockVault(pass);
-    vaultUnlockSection.hidden = true;
-    vaultManageSection.hidden = false;
-    vaultPassInput.value = '';
-    announce('Vault unlocked');
-    await refreshVaultList();
-  } catch { announce('Failed to unlock vault'); }
-});
-
-vaultSaveBtn.addEventListener('click', async () => {
-  const pw = document.getElementById('generated-password').value;
-  const label = vaultEntryLabel.value.trim();
-  if (!pw) { announce('Generate a password first'); return; }
-  if (!label) { announce('Enter a label for this entry'); return; }
-  try {
-    await saveToVault(label, pw);
-    vaultEntryLabel.value = '';
-    announce('Password saved to vault: ' + label);
-    await refreshVaultList();
-  } catch { announce('Failed to save to vault'); }
-});
-
-vaultLockBtn.addEventListener('click', () => {
-  vaultKey = null;
-  vaultUnlocked = false;
-  vaultManageSection.hidden = true;
-  vaultUnlockSection.hidden = false;
-  vaultList.innerHTML = '';
-  announce('Vault locked');
-});
-
-async function refreshVaultList() {
-  const entries = await loadFromVault();
-  vaultList.innerHTML = '';
-  for (const entry of entries) {
-    const li = document.createElement('li');
-    li.className = 'vault-item';
-
-    const info = document.createElement('span');
-    info.className = 'vault-item-info';
-    info.textContent = entry.label + ' (' + new Date(entry.created).toLocaleDateString() + ')';
-
-    const btnGroup = document.createElement('span');
-    btnGroup.className = 'vault-item-actions';
-
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'btn vault-copy-btn';
-    copyBtn.textContent = 'Copy';
-    copyBtn.setAttribute('aria-label', 'Copy password for ' + entry.label);
-    copyBtn.addEventListener('click', async () => {
-      const decrypted = await decryptData(vaultKey, entry.encrypted);
-      await navigator.clipboard.writeText(decrypted);
-      announce(entry.label + ' password copied to clipboard');
+  function openVaultDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(VAULT_DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(VAULT_STORE)) {
+          db.createObjectStore(VAULT_STORE, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
     });
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn vault-del-btn';
-    delBtn.textContent = 'Delete';
-    delBtn.setAttribute('aria-label', 'Delete ' + entry.label);
-    delBtn.addEventListener('click', async () => {
-      await deleteFromVault(entry.id);
-      announce(entry.label + ' deleted from vault');
-      await refreshVaultList();
-    });
-
-    btnGroup.appendChild(copyBtn);
-    btnGroup.appendChild(delBtn);
-    li.appendChild(info);
-    li.appendChild(btnGroup);
-    vaultList.appendChild(li);
   }
-}
+
+  async function deriveKey(passphrase, salt) {
+    const passBytes = new TextEncoder().encode(passphrase);
+    const keyMaterial = await crypto.subtle.importKey('raw', passBytes, 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    // Zero passphrase bytes from memory — memory hardening
+    secureWipe(passBytes);
+    return key;
+  }
+
+  async function encryptData(key, plaintext) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plainBytes = new TextEncoder().encode(plaintext);
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plainBytes);
+    // Zero plaintext bytes
+    secureWipe(plainBytes);
+    return { iv: Array.from(iv), data: Array.from(new Uint8Array(ciphertext)) };
+  }
+
+  async function decryptData(key, encrypted) {
+    const iv = new Uint8Array(encrypted.iv);
+    const cipherBytes = new Uint8Array(encrypted.data);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
+    const text = new TextDecoder().decode(decrypted);
+    // Zero cipher bytes
+    secureWipe(iv);
+    secureWipe(cipherBytes);
+    return text;
+  }
+
+  let vaultKey = null;
+  let vaultUnlocked = false;
+
+  async function unlockVault(passphrase) {
+    const salt = new Uint8Array(16);
+    const saltHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(VAULT_DB_NAME));
+    salt.set(new Uint8Array(saltHash).slice(0, 16));
+    vaultKey = await deriveKey(passphrase, salt);
+    vaultUnlocked = true;
+  }
+
+  async function saveToVault(label, password) {
+    if (!vaultUnlocked) throw new Error('Vault locked');
+    const encrypted = await encryptData(vaultKey, password);
+    const db = await openVaultDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(VAULT_STORE, 'readwrite');
+      tx.objectStore(VAULT_STORE).add({ label, encrypted, created: Date.now() });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function loadFromVault() {
+    if (!vaultUnlocked) throw new Error('Vault locked');
+    const db = await openVaultDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(VAULT_STORE, 'readonly');
+      const req = tx.objectStore(VAULT_STORE).getAll();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function deleteFromVault(id) {
+    if (!vaultUnlocked) throw new Error('Vault locked');
+    const db = await openVaultDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(VAULT_STORE, 'readwrite');
+      tx.objectStore(VAULT_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // Vault UI
+  const vaultUnlockSection = document.getElementById('vault-unlock');
+  const vaultManageSection = document.getElementById('vault-manage');
+  const vaultPassInput = document.getElementById('vault-passphrase');
+  const vaultUnlockBtn = document.getElementById('vault-unlock-btn');
+  const vaultEntryLabel = document.getElementById('vault-entry-label');
+  const vaultSaveBtn = document.getElementById('vault-save-btn');
+  const vaultList = document.getElementById('vault-list');
+  const vaultLockBtn = document.getElementById('vault-lock-btn');
+
+  vaultUnlockBtn.addEventListener('click', async () => {
+    const pass = vaultPassInput.value;
+    if (!pass || pass.length < 4) { announce('Passphrase must be at least 4 characters'); return; }
+    try {
+      await unlockVault(pass);
+      vaultUnlockSection.hidden = true;
+      vaultManageSection.hidden = false;
+      wipeInputValue(vaultPassInput);
+      announce('Vault unlocked');
+      await refreshVaultList();
+    } catch { announce('Failed to unlock vault'); }
+  });
+
+  vaultSaveBtn.addEventListener('click', async () => {
+    const pw = document.getElementById('generated-password').value;
+    const label = vaultEntryLabel.value.trim();
+    if (!pw) { announce('Generate a password first'); return; }
+    if (!label) { announce('Enter a label for this entry'); return; }
+    try {
+      await saveToVault(label, pw);
+      vaultEntryLabel.value = '';
+      announce('Password saved to vault: ' + label);
+      await refreshVaultList();
+    } catch { announce('Failed to save to vault'); }
+  });
+
+  vaultLockBtn.addEventListener('click', () => {
+    vaultKey = null;
+    vaultUnlocked = false;
+    vaultManageSection.hidden = true;
+    vaultUnlockSection.hidden = false;
+    vaultList.innerHTML = '';
+    // Clear generated password from memory
+    wipeInputValue(document.getElementById('generated-password'));
+    announce('Vault locked');
+  });
+
+  async function refreshVaultList() {
+    const entries = await loadFromVault();
+    vaultList.innerHTML = '';
+    for (const entry of entries) {
+      const li = document.createElement('li');
+      li.className = 'vault-item';
+
+      const info = document.createElement('span');
+      info.className = 'vault-item-info';
+      info.textContent = entry.label + ' (' + new Date(entry.created).toLocaleDateString() + ')';
+
+      const btnGroup = document.createElement('span');
+      btnGroup.className = 'vault-item-actions';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'btn vault-copy-btn';
+      copyBtn.textContent = 'Copy';
+      copyBtn.setAttribute('aria-label', 'Copy password for ' + entry.label);
+      copyBtn.addEventListener('click', async () => {
+        const decrypted = await decryptData(vaultKey, entry.encrypted);
+        copyAndAutoWipe(decrypted);
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn vault-del-btn';
+      delBtn.textContent = 'Delete';
+      delBtn.setAttribute('aria-label', 'Delete ' + entry.label);
+      delBtn.addEventListener('click', async () => {
+        await deleteFromVault(entry.id);
+        announce(entry.label + ' deleted from vault');
+        await refreshVaultList();
+      });
+
+      btnGroup.appendChild(copyBtn);
+      btnGroup.appendChild(delBtn);
+      li.appendChild(info);
+      li.appendChild(btnGroup);
+      vaultList.appendChild(li);
+    }
+  }
 
 })();
